@@ -30,45 +30,45 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 // Configure Identity options
 builder.Services.Configure<IdentityOptions>(options =>
     {
-      // Password settings
-      options.Password.RequireDigit = true;
-      options.Password.RequiredLength = 6;
-      options.Password.RequireNonAlphanumeric = true;
-      options.Password.RequireUppercase = true;
-      options.Password.RequireLowercase = true;
-      // Lockout settings
+        // Password settings
+        options.Password.RequireDigit = true;
+        options.Password.RequiredLength = 6;
+        options.Password.RequireNonAlphanumeric = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireLowercase = true;
+        // Lockout settings
 
-      // options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-      // options.Lockout.MaxFailedAccessAttempts = 5;
+        // options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        // options.Lockout.MaxFailedAccessAttempts = 5;
     });
 
 // Configure JWT authentication
 // Configure authentication to use JWT bearer tokens instead of cookies
 builder.Services.AddAuthentication(options =>
 {
-  options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-  options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-  options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
-  options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-  options.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
-  options.DefaultSignOutScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultSignInScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultSignOutScheme = JwtBearerDefaults.AuthenticationScheme;
 
 }).AddJwtBearer(options =>
 {
-// Set up the token validation parameters
-  options.TokenValidationParameters = new TokenValidationParameters
-  {
-    ValidateIssuer = true,
-    ValidateAudience = true,
+    // Set up the token validation parameters
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
 
-    ValidateLifetime = true,
-    ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
 
-    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-    ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
 
-    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-  };
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
 });
 
 builder.Services.AddAuthorization();
@@ -78,8 +78,8 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-  app.UseSwagger();
-  app.UseSwaggerUI();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseAuthentication();

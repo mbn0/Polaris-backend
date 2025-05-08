@@ -20,53 +20,60 @@ namespace backend.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
-        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration)
+        private readonly PolarisDbContext _context;
+        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration, PolarisDbContext context)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
+            _context = context;
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register ([FromBody] RegistrationDto registrationDto)
+        public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto)
         {
-          try 
-          {
-            if (!ModelState.IsValid)
+            try
             {
-              return BadRequest(ModelState);
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var existingUser = await _userManager.FindByEmailAsync(registrationDto.Email);
+                if (existingUser != null)
+                    return BadRequest("A user with this email already exists.");
+
+                var appUser = new ApplicationUser
+                {
+                    UserName = registrationDto.Email,
+                    Email = registrationDto.Email,
+                };
+
+                var createUserResult = await _userManager.CreateAsync(appUser, registrationDto.Password);
+
+                if (createUserResult.Succeeded)
+                {
+                    var roleResult = await _userManager.AddToRoleAsync(appUser, "Student");
+                    if (!roleResult.Succeeded)
+                    { return StatusCode(500, roleResult.Errors); }
+                }
+                else
+                { return StatusCode(500, createUserResult.Errors); }
+
+                var student = new Student
+                  {
+                    MatricNo = registrationDto.MatricNo,
+                    UserId = appUser.Id 
+                  };
+
+                _context.Students.Add(student);
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Student registered successfully." });
             }
-
-            var appUser = new ApplicationUser
+            catch (Exception ex)
             {
-              UserName = registrationDto.Email,
-              Email = registrationDto.Email,
-            };
-
-            var createuser = await _userManager.CreateAsync(appUser, registrationDto.Password);
-
-            if (createuser.Succeeded)
-            {
-              var roleResult = await _userManager.AddToRoleAsync(appUser, "Student");
-              if(roleResult.Succeeded)
-              {
-                return Ok(new { message = "User created successfully" });
-              }
-              else
-              {
-                  return StatusCode(500, roleResult.Errors);
-              }
+                return BadRequest(new { message = ex.Message });
             }
-            else 
-            {
-              return StatusCode(500, createuser.Errors);
-            }
-
-          } catch (Exception ex) 
-          {
-            return BadRequest(new { message = ex.Message });
-
-          }
         }
     }
 }
