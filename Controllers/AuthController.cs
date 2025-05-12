@@ -6,8 +6,10 @@ using backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 
@@ -31,6 +33,36 @@ namespace backend.Controllers
             _configuration = configuration;
             _context = context;
             _tokenService = tokenService;
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
+        {
+          if (!ModelState.IsValid)
+          {
+            return BadRequest(ModelState);
+          }
+          var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == loginDto.Username.ToLower()); 
+
+          if (user == null)
+          { return Unauthorized("Invalid username or password"); }
+
+          var result = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
+
+          if(!result.Succeeded)
+          { return Unauthorized("Invalid username or password"); }
+
+          var student = _context.Students.FirstOrDefault(x => x.UserId == user.Id);
+
+          return Ok(new NewStudentDto
+          {
+            FullName = user.FullName,
+            MatricNo = student.MatricNo ?? "",
+            Email = user.Email ??"",
+            Token = await _tokenService.CreateToken(user),
+            SectionId = student.SectionId ?? 0
+          });
+          
         }
 
         [HttpPost("register")]
