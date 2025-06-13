@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -76,6 +77,10 @@ builder.Services.Configure<IdentityOptions>(options =>
         // options.Lockout.MaxFailedAccessAttempts = 5;
     });
 
+// AllowAnyOrigin
+builder.Services.AddCors(policy =>
+        { policy.AddPolicy("AllowOrigin", option => option.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()); });
+
 // Configure JWT authentication
 // Configure authentication to use JWT bearer tokens instead of cookies
 builder.Services.AddAuthentication(options =>
@@ -117,13 +122,22 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseCors("AllowOrigin");
 app.UseAuthorization(); // if using [Authorize] somewhere
 app.MapControllers();   // required for route mapping
+
+// for Prometheus
+app.UseEndpoints(endpoints =>
+    {
+    // Prometheus will scrape this URL
+    endpoints.MapMetrics(); // exposes /metrics
+    });
 
 app.Run();

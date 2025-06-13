@@ -45,12 +45,12 @@ namespace backend.Controllers
           var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == loginDto.Username.ToLower()); 
 
           if (user == null)
-          { return Unauthorized("Invalid username or password"); }
+          { return Unauthorized(new {message= "Invalid username or password"}); }
 
           var result = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
 
           if(!result.Succeeded)
-          { return Unauthorized("Invalid username or password"); }
+           { return Unauthorized(new {message= "Invalid username or password"}); }
 
           var student = _context.Students.FirstOrDefault(x => x.UserId == user.Id);
 
@@ -77,7 +77,7 @@ namespace backend.Controllers
 
                 var existingUser = await _userManager.FindByEmailAsync(registrationDto.Email);
                 if (existingUser != null)
-                    return BadRequest("A user with this email already exists.");
+                    return BadRequest(new {message = "A user with this email already exists."});
 
                 var appUser = new ApplicationUser
                 {
