@@ -15,6 +15,11 @@ using System.Text;
 
 namespace backend.Controllers
 {
+    public class AdminRegistrationDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
 
     [Route("api/[controller]")]
     [ApiController]
@@ -38,32 +43,93 @@ namespace backend.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-          if (!ModelState.IsValid)
-          {
-            return BadRequest(ModelState);
-          }
-          var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == loginDto.Username.ToLower()); 
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-          if (user == null)
-          { return Unauthorized(new {message= "Invalid username or password"}); }
+            var user = await _userManager.Users
+                          .FirstOrDefaultAsync(u => u.UserName == loginDto.Email.ToLower());
+            if (user == null)
+                return Unauthorized(new { message = "Invalid username or password" });
 
-          var result = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
+            var pwCheck = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
+            if (!pwCheck.Succeeded)
+                return Unauthorized(new { message = "Invalid username or password" });
 
-          if(!result.Succeeded)
-           { return Unauthorized(new {message= "Invalid username or password"}); }
+            // build base response
+            var roles = await _userManager.GetRolesAsync(user);
+            var resp = new AuthResponseDto
+            {
+                FullName = user.FullName,
+                Email = user.Email!,
+                Roles = roles,
+                Token = await _tokenService.CreateToken(user)
+            };
 
-          var student = _context.Students.FirstOrDefault(x => x.UserId == user.Id);
+            // student-specific info
+            if (roles.Contains("Student"))
+            {
+                var student = await _context.Students
+                                   .FirstOrDefaultAsync(s => s.UserId == user.Id);
+                resp.MatricNo = student?.MatricNo;
+                resp.SectionId = student?.SectionId;
+            }
+            // instructor-specific info
+            else if (roles.Contains("Instructor"))
+            {
+                var instructor = await _context.Instructors
+                                       .FirstOrDefaultAsync(i => i.UserId == user.Id);
+                // e.g. resp.InstructorId = instructor?.InstructorId;
+                // add whatever else you need for instructors
+            }
 
-          return Ok(new NewStudentDto
-          {
-            FullName = user.FullName,
-            MatricNo = student.MatricNo ?? "",
-            Email = user.Email ??"",
-            Token = await _tokenService.CreateToken(user),
-            SectionId = student.SectionId ?? 0
-          });
-          
+            return Ok(resp);
         }
+
+        [HttpPost("admin-register")]
+        public async Task<IActionResult> AdminRegister([FromBody] AdminRegistrationDto registrationDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var existingUser = await _userManager.FindByEmailAsync(registrationDto.Email);
+                if (existingUser != null)
+                    return BadRequest(new { message = "A user with this email already exists." });
+
+                var appUser = new ApplicationUser
+                {
+                    UserName = registrationDto.Email,
+                    Email = registrationDto.Email,
+                };
+
+                var createUserResult = await _userManager.CreateAsync(appUser, registrationDto.Password);
+
+                if (createUserResult.Succeeded)
+                {
+                    var roleResult = await _userManager.AddToRoleAsync(appUser, "Admin");
+                    if (!roleResult.Succeeded)
+                    { return StatusCode(500, roleResult.Errors); }
+
+                }
+                else
+                { return StatusCode(500, createUserResult.Errors); }
+
+                var token = await _tokenService.CreateToken(appUser);
+                return Ok(new
+                {
+                    Email = appUser.Email,
+                    Token = token
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        //admin-login
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto)
@@ -77,7 +143,7 @@ namespace backend.Controllers
 
                 var existingUser = await _userManager.FindByEmailAsync(registrationDto.Email);
                 if (existingUser != null)
-                    return BadRequest(new {message = "A user with this email already exists."});
+                    return BadRequest(new { message = "A user with this email already exists." });
 
                 var appUser = new ApplicationUser
                 {
@@ -97,10 +163,10 @@ namespace backend.Controllers
                 { return StatusCode(500, createUserResult.Errors); }
 
                 var student = new Student
-                  {
+                {
                     MatricNo = registrationDto.MatricNo,
-                    UserId = appUser.Id 
-                  };
+                    UserId = appUser.Id
+                };
 
                 _context.Students.Add(student);
                 await _context.SaveChangesAsync();

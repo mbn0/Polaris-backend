@@ -1,4 +1,3 @@
-
 namespace backend.Models
 {
     public class Instructor
