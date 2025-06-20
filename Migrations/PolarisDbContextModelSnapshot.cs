@@ -51,19 +51,19 @@ namespace backend.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "7ed98d4c-51bc-4d1a-8707-35f514043c2b",
+                            Id = "25129b39-4913-40fe-8069-be15ebd12ab3",
                             Name = "Student",
                             NormalizedName = "STUDENT"
                         },
                         new
                         {
-                            Id = "128f3e8f-2f52-4664-a1e5-0ffcd1aa4c68",
+                            Id = "38a7569a-86a6-4239-8575-924f6b797b11",
                             Name = "Instructor",
                             NormalizedName = "INSTRUCTOR"
                         },
                         new
                         {
-                            Id = "b92be5f8-bf71-47c7-a215-600736a1dd8b",
+                            Id = "61162b42-e842-4055-a928-82277e1118db",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
                         });
@@ -337,6 +337,24 @@ namespace backend.Migrations
                     b.ToTable("Sections");
                 });
 
+            modelBuilder.Entity("backend.Models.SectionAssessmentVisibility", b =>
+                {
+                    b.Property<int>("SectionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AssessmentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("bit");
+
+                    b.HasKey("SectionId", "AssessmentId");
+
+                    b.HasIndex("AssessmentId");
+
+                    b.ToTable("SectionAssessmentVisibilities");
+                });
+
             modelBuilder.Entity("backend.Models.Student", b =>
                 {
                     b.Property<int>("StudentId")
@@ -462,6 +480,25 @@ namespace backend.Migrations
                     b.Navigation("Instructor");
                 });
 
+            modelBuilder.Entity("backend.Models.SectionAssessmentVisibility", b =>
+                {
+                    b.HasOne("backend.Models.Assessment", "Assessment")
+                        .WithMany("SectionVisibilities")
+                        .HasForeignKey("AssessmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("backend.Models.Section", "Section")
+                        .WithMany("AssessmentVisibilities")
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Assessment");
+
+                    b.Navigation("Section");
+                });
+
             modelBuilder.Entity("backend.Models.Student", b =>
                 {
                     b.HasOne("backend.Models.Section", "Section")
@@ -489,6 +526,8 @@ namespace backend.Migrations
             modelBuilder.Entity("backend.Models.Assessment", b =>
                 {
                     b.Navigation("Results");
+
+                    b.Navigation("SectionVisibilities");
                 });
 
             modelBuilder.Entity("backend.Models.Instructor", b =>
@@ -498,6 +537,8 @@ namespace backend.Migrations
 
             modelBuilder.Entity("backend.Models.Section", b =>
                 {
+                    b.Navigation("AssessmentVisibilities");
+
                     b.Navigation("Results");
 
                     b.Navigation("Students");

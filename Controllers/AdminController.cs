@@ -40,8 +40,8 @@ namespace backend.Controllers
         public async Task<ActionResult<IEnumerable<SectionDto>>> GetSections()
         {
             var sections = await _context.Sections
-                .Include(s => s.Instructor).ThenInclude(i => i.User)
-                .Include(s => s.Students).ThenInclude(st => st.User)
+                .Include(s => s.Instructor).ThenInclude(i => i!.User)
+                .Include(s => s.Students).ThenInclude(st => st!.User)
                 .ToListAsync();
 
             return sections.Select(s => new SectionDto
@@ -62,8 +62,8 @@ namespace backend.Controllers
         public async Task<ActionResult<SectionDto>> GetSection(int id)
         {
             var s = await _context.Sections
-                .Include(x => x.Instructor).ThenInclude(i => i.User)
-                .Include(x => x.Students).ThenInclude(st => st.User)
+                .Include(x => x.Instructor).ThenInclude(i => i!.User)
+                .Include(x => x.Students).ThenInclude(st => st!.User)
                 .FirstOrDefaultAsync(x => x.SectionId == id);
 
             if (s == null) return NotFound();

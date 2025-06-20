@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace backend.Migrations
 {
     /// <inheritdoc />
@@ -210,6 +212,31 @@ namespace backend.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SectionAssessmentVisibilities",
+                columns: table => new
+                {
+                    SectionId = table.Column<int>(type: "int", nullable: false),
+                    AssessmentId = table.Column<int>(type: "int", nullable: false),
+                    IsVisible = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SectionAssessmentVisibilities", x => new { x.SectionId, x.AssessmentId });
+                    table.ForeignKey(
+                        name: "FK_SectionAssessmentVisibilities_Assessments_AssessmentId",
+                        column: x => x.AssessmentId,
+                        principalTable: "Assessments",
+                        principalColumn: "AssessmentID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_SectionAssessmentVisibilities_Sections_SectionId",
+                        column: x => x.SectionId,
+                        principalTable: "Sections",
+                        principalColumn: "SectionId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Students",
                 columns: table => new
                 {
@@ -267,6 +294,16 @@ namespace backend.Migrations
                         principalTable: "Students",
                         principalColumn: "StudentId",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                table: "AspNetRoles",
+                columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
+                values: new object[,]
+                {
+                    { "25129b39-4913-40fe-8069-be15ebd12ab3", null, "Student", "STUDENT" },
+                    { "38a7569a-86a6-4239-8575-924f6b797b11", null, "Instructor", "INSTRUCTOR" },
+                    { "61162b42-e842-4055-a928-82277e1118db", null, "Admin", "ADMIN" }
                 });
 
             migrationBuilder.CreateIndex(
@@ -330,6 +367,11 @@ namespace backend.Migrations
                 column: "StudentId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SectionAssessmentVisibilities_AssessmentId",
+                table: "SectionAssessmentVisibilities",
+                column: "AssessmentId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Sections_InstructorId",
                 table: "Sections",
                 column: "InstructorId");
@@ -368,13 +410,16 @@ namespace backend.Migrations
                 name: "Results");
 
             migrationBuilder.DropTable(
+                name: "SectionAssessmentVisibilities");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "Assessments");
+                name: "Students");
 
             migrationBuilder.DropTable(
-                name: "Students");
+                name: "Assessments");
 
             migrationBuilder.DropTable(
                 name: "Sections");
