@@ -16,6 +16,7 @@ namespace backend.Data
     public DbSet<Section> Sections { get; set; } = default!;
     public DbSet<Assessment> Assessments { get; set; } = default!;
     public DbSet<Result> Results { get; set; } = default!;
+    public DbSet<SectionAssessmentVisibility> SectionAssessmentVisibilities { get; set; } = default!;
 
       protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +61,19 @@ namespace backend.Data
             .HasOne(r => r.Assessment)
             .WithMany(a => a.Results)
             .HasForeignKey(r => r.AssessmentId);
+
+        modelBuilder.Entity<SectionAssessmentVisibility>()
+            .HasKey(sav => new { sav.SectionId, sav.AssessmentId });
+
+        modelBuilder.Entity<SectionAssessmentVisibility>()
+            .HasOne(sav => sav.Section)
+            .WithMany(s => s.AssessmentVisibilities)
+            .HasForeignKey(sav => sav.SectionId);
+
+        modelBuilder.Entity<SectionAssessmentVisibility>()
+            .HasOne(sav => sav.Assessment)
+            .WithMany(a => a.SectionVisibilities)
+            .HasForeignKey(sav => sav.AssessmentId);
 
     }
 }

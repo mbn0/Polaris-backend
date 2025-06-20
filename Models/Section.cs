@@ -10,5 +10,7 @@ namespace backend.Models
 
     public ICollection<Student>? Students { get; set; }
     public ICollection<Result>? Results { get; set; }
+
+    public ICollection<SectionAssessmentVisibility> AssessmentVisibilities { get; set; } = new List<SectionAssessmentVisibility>();
   }
 }

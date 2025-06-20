@@ -106,7 +106,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
 
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? string.Empty))
 
     };
 });
@@ -132,12 +132,5 @@ app.UseRouting();
 app.UseCors("AllowOrigin");
 app.UseAuthorization(); // if using [Authorize] somewhere
 app.MapControllers();   // required for route mapping
-
-// for Prometheus
-app.UseEndpoints(endpoints =>
-    {
-    // Prometheus will scrape this URL
-    endpoints.MapMetrics(); // exposes /metrics
-    });
 
 app.Run();

@@ -8,5 +8,6 @@ namespace backend.Models
     public string Description { get; set; } = string.Empty;
 
     public ICollection<Result> Results { get; set; } = new List<Result>();
+    public ICollection<SectionAssessmentVisibility> SectionVisibilities { get; set; } = new List<SectionAssessmentVisibility>();
   }
 }
