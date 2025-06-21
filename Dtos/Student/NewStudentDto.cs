@@ -1,5 +1,5 @@
 // the object returend after creating a new student
-namespace backend.Dtos
+namespace backend.Dtos.Student
 {
     public class NewStudentDto
     {
