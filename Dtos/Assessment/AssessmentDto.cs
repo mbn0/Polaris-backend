@@ -1,4 +1,4 @@
-namespace backend.Dtos
+namespace backend.Dtos.Assessment
 {
     public class AssessmentDto
     {

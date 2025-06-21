@@ -20,6 +20,15 @@ builder.Services.AddSwaggerGen();
 //Interfaces 
 builder.Services.AddScoped<ITokenService, ToeknService>();
 
+// Repository pattern
+builder.Services.AddScoped<backend.Repositories.Interfaces.IUnitOfWork, backend.Repositories.Implementations.UnitOfWork>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.ISectionRepository, backend.Repositories.Implementations.SectionRepository>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.IStudentRepository, backend.Repositories.Implementations.StudentRepository>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.IInstructorRepository, backend.Repositories.Implementations.InstructorRepository>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.IAssessmentVisibilityRepository, backend.Repositories.Implementations.AssessmentVisibilityRepository>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.IResultRepository, backend.Repositories.Implementations.ResultRepository>();
+builder.Services.AddScoped<backend.Repositories.Interfaces.IAssessmentRepository, backend.Repositories.Implementations.AssessmentRepository>();
+
 // hosting on local network
 /*builder.WebHost.UseUrls("http://0.0.0.0:5000", "https://0.0.0.0:5001");*/
 builder.Services.AddSwaggerGen(option =>

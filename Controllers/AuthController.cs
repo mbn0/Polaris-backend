@@ -1,6 +1,6 @@
-
 using backend.Data;
-using backend.Dtos;
+using backend.Dtos.Auth;
+using backend.Dtos.Student;
 using backend.Interfaces;
 using backend.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -12,14 +12,15 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using backend.Repositories.Interfaces;
 
 namespace backend.Controllers
 {
     public class AdminRegistrationDto
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
 
     [Route("api/[controller]")]
     [ApiController]
@@ -28,15 +29,15 @@ namespace backend.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
-        private readonly PolarisDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ITokenService _tokenService;
 
-        public AuthController(ITokenService tokenService, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration, PolarisDbContext context)
+        public AuthController(ITokenService tokenService, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration, IUnitOfWork unitOfWork)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
-            _context = context;
+            _unitOfWork = unitOfWork;
             _tokenService = tokenService;
         }
 
@@ -67,16 +68,14 @@ namespace backend.Controllers
             // student-specific info
             if (roles.Contains("Student"))
             {
-                var student = await _context.Students
-                                   .FirstOrDefaultAsync(s => s.UserId == user.Id);
+                var student = await _unitOfWork.Students.GetByUserIdAsync(user.Id);
                 resp.MatricNo = student?.MatricNo;
                 resp.SectionId = student?.SectionId;
             }
             // instructor-specific info
             else if (roles.Contains("Instructor"))
             {
-                var instructor = await _context.Instructors
-                                       .FirstOrDefaultAsync(i => i.UserId == user.Id);
+                var instructor = await _unitOfWork.Instructors.GetByUserIdAsync(user.Id);
                 // e.g. resp.InstructorId = instructor?.InstructorId;
                 // add whatever else you need for instructors
             }
@@ -134,16 +133,21 @@ namespace backend.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegistrationDto registrationDto)
         {
+            await _unitOfWork.BeginTransactionAsync();
             try
             {
                 if (!ModelState.IsValid)
                 {
+                    await _unitOfWork.RollbackTransactionAsync();
                     return BadRequest(ModelState);
                 }
 
                 var existingUser = await _userManager.FindByEmailAsync(registrationDto.Email);
                 if (existingUser != null)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
                     return BadRequest(new { message = "A user with this email already exists." });
+                }
 
                 var appUser = new ApplicationUser
                 {
@@ -157,10 +161,16 @@ namespace backend.Controllers
                 {
                     var roleResult = await _userManager.AddToRoleAsync(appUser, "Student");
                     if (!roleResult.Succeeded)
-                    { return StatusCode(500, roleResult.Errors); }
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return StatusCode(500, roleResult.Errors);
+                    }
                 }
                 else
-                { return StatusCode(500, createUserResult.Errors); }
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return StatusCode(500, createUserResult.Errors);
+                }
 
                 var student = new Student
                 {
@@ -168,8 +178,10 @@ namespace backend.Controllers
                     UserId = appUser.Id
                 };
 
-                _context.Students.Add(student);
-                await _context.SaveChangesAsync();
+                await _unitOfWork.Students.AddAsync(student);
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
                 return Ok(new NewStudentDto
                 {
                     FullName = appUser.FullName,
@@ -181,6 +193,7 @@ namespace backend.Controllers
             }
             catch (Exception ex)
             {
+                await _unitOfWork.RollbackTransactionAsync();
                 return BadRequest(new { message = ex.Message });
             }
         }
