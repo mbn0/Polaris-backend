@@ -153,6 +153,7 @@ namespace backend.Controllers
                 {
                     UserName = registrationDto.Email,
                     Email = registrationDto.Email,
+                    FullName = registrationDto.FullName
                 };
 
                 var createUserResult = await _userManager.CreateAsync(appUser, registrationDto.Password);
