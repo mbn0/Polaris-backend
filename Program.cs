@@ -29,8 +29,11 @@ builder.Services.AddScoped<backend.Repositories.Interfaces.IAssessmentVisibility
 builder.Services.AddScoped<backend.Repositories.Interfaces.IResultRepository, backend.Repositories.Implementations.ResultRepository>();
 builder.Services.AddScoped<backend.Repositories.Interfaces.IAssessmentRepository, backend.Repositories.Implementations.AssessmentRepository>();
 
-// hosting on local network
-/*builder.WebHost.UseUrls("http://0.0.0.0:5000", "https://0.0.0.0:5001");*/
+// Configure URLs for development
+if (builder.Environment.IsDevelopment())
+{
+    builder.WebHost.UseUrls("http://localhost:5240");
+}
 builder.Services.AddSwaggerGen(option =>
 {
     option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "v1" });
@@ -136,7 +139,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseRouting();
 app.UseCors("AllowOrigin");
 app.UseAuthorization(); // if using [Authorize] somewhere
