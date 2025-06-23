@@ -8,6 +8,7 @@ namespace backend.Repositories.Interfaces
         IAssessmentVisibilityRepository AssessmentVisibilities { get; }
         IResultRepository Results { get; }
         IAssessmentRepository Assessments { get; }
+        IFeedbackRepository Feedbacks { get; }
         
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();

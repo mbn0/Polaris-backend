@@ -10,14 +10,14 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace backend.Services
 {
-    public class ToeknService : ITokenService
+    public class TokenService : ITokenService
     {
         private readonly IConfiguration _config;
         private readonly SymmetricSecurityKey _key;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly PolarisDbContext _context;
 
-        public ToeknService(IConfiguration config, UserManager<ApplicationUser> userManager, PolarisDbContext context)
+        public TokenService(IConfiguration config, UserManager<ApplicationUser> userManager, PolarisDbContext context)
         {
 
             _config = config;

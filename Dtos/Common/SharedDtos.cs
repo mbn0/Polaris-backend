@@ -55,7 +55,16 @@ namespace backend.Dtos.Common
     {
         public string Email     { get; set; } = string.Empty;
         public string FullName  { get; set; } = string.Empty;
+        /// <summary>
+        /// Optional: Only provide if you want to change the user's password
+        /// Leave null or empty to keep existing password unchanged
+        /// </summary>
         public string? Password { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
+    }
+
+    public class UpdatePasswordDto
+    {
+        public string NewPassword { get; set; } = string.Empty;
     }
 } 

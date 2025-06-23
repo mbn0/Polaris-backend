@@ -18,7 +18,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 //Interfaces 
-builder.Services.AddScoped<ITokenService, ToeknService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Repository pattern
 builder.Services.AddScoped<backend.Repositories.Interfaces.IUnitOfWork, backend.Repositories.Implementations.UnitOfWork>();
@@ -73,6 +73,9 @@ builder.Services.AddControllers();
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<PolarisDbContext>()
     .AddDefaultTokenProviders();
+
+// Explicitly register RoleManager
+builder.Services.AddScoped<RoleManager<IdentityRole>>();
 
 // Configure Identity options
 builder.Services.Configure<IdentityOptions>(options =>
