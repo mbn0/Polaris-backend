@@ -15,6 +15,7 @@ namespace backend.Repositories.Implementations
         private IAssessmentVisibilityRepository? _assessmentVisibilities;
         private IResultRepository? _results;
         private IAssessmentRepository? _assessments;
+        private IFeedbackRepository? _feedbacks;
 
         public UnitOfWork(PolarisDbContext context)
         {
@@ -38,6 +39,9 @@ namespace backend.Repositories.Implementations
 
         public IAssessmentRepository Assessments =>
             _assessments ??= new AssessmentRepository(_context);
+
+        public IFeedbackRepository Feedbacks =>
+            _feedbacks ??= new FeedbackRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

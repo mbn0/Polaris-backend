@@ -262,21 +262,76 @@ namespace backend.Controllers
             var u = await _userManager.FindByIdAsync(id);
             if (u == null) return NotFound();
 
+            // Update basic user properties
             u.Email = dto.Email;
             u.UserName = dto.Email;
             u.FullName = dto.FullName;
-            var pwdRes = await _userManager.RemovePasswordAsync(u);
-            if (dto.Password is not null)
-                await _userManager.AddPasswordAsync(u, dto.Password);
+            
+            // Only update password if it's provided
+            if (!string.IsNullOrEmpty(dto.Password))
+            {
+                // Remove existing password and add new one
+                var removePasswordResult = await _userManager.RemovePasswordAsync(u);
+                if (removePasswordResult.Succeeded)
+                {
+                    var addPasswordResult = await _userManager.AddPasswordAsync(u, dto.Password);
+                    if (!addPasswordResult.Succeeded)
+                    {
+                        return BadRequest(new { message = "Failed to update password", errors = addPasswordResult.Errors });
+                    }
+                }
+                else
+                {
+                    return BadRequest(new { message = "Failed to remove existing password", errors = removePasswordResult.Errors });
+                }
+            }
+            // If password is null or empty, we keep the existing password unchanged
 
+            // Update user roles
             var currentRoles = await _userManager.GetRolesAsync(u);
             // remove outdated roles
             await _userManager.RemoveFromRolesAsync(u, currentRoles.Except(dto.Roles));
             // add new roles
             await _userManager.AddToRolesAsync(u, dto.Roles.Except(currentRoles));
 
+            // Update the user in Identity
+            var updateResult = await _userManager.UpdateAsync(u);
+            if (!updateResult.Succeeded)
+            {
+                return BadRequest(new { message = "Failed to update user", errors = updateResult.Errors });
+            }
+
             await _unitOfWork.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpPut("users/{id}/password")]
+        public async Task<ActionResult> UpdateUserPassword(string id, [FromBody] UpdatePasswordDto dto)
+        {
+            var u = await _userManager.FindByIdAsync(id);
+            if (u == null) return NotFound();
+
+            if (string.IsNullOrEmpty(dto.NewPassword))
+            {
+                return BadRequest(new { message = "New password is required" });
+            }
+
+            // Remove existing password and add new one
+            var removePasswordResult = await _userManager.RemovePasswordAsync(u);
+            if (removePasswordResult.Succeeded)
+            {
+                var addPasswordResult = await _userManager.AddPasswordAsync(u, dto.NewPassword);
+                if (!addPasswordResult.Succeeded)
+                {
+                    return BadRequest(new { message = "Failed to update password", errors = addPasswordResult.Errors });
+                }
+            }
+            else
+            {
+                return BadRequest(new { message = "Failed to remove existing password", errors = removePasswordResult.Errors });
+            }
+
+            return Ok(new { message = "Password updated successfully" });
         }
 
         [HttpDelete("users/{id}")]

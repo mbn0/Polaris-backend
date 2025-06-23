@@ -17,6 +17,7 @@ namespace backend.Data
     public DbSet<Assessment> Assessments { get; set; } = default!;
     public DbSet<Result> Results { get; set; } = default!;
     public DbSet<SectionAssessmentVisibility> SectionAssessmentVisibilities { get; set; } = default!;
+    public DbSet<Feedback> Feedbacks { get; set; } = default!;
 
       protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,12 @@ namespace backend.Data
             .HasOne(sav => sav.Assessment)
             .WithMany(a => a.SectionVisibilities)
             .HasForeignKey(sav => sav.AssessmentId);
+
+        modelBuilder.Entity<Feedback>()
+            .HasOne(f => f.User)
+            .WithMany()
+            .HasForeignKey(f => f.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
     }
 }
