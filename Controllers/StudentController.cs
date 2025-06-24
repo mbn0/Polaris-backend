@@ -42,7 +42,7 @@ namespace backend.Controllers
                 return Forbid("You can only view your own section.");
             }
 
-            var section = await _unitOfWork.Sections.GetSectionWithAssessmentVisibilitiesAsync(sectionId);
+            var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
 
             if (section == null)
             {
@@ -51,6 +51,32 @@ namespace backend.Controllers
 
             // Get instructor details separately
             var instructor = await _unitOfWork.Instructors.GetInstructorWithUserAsync(section.InstructorId);
+
+            // Get all assessments (globally available)
+            var allAssessments = await _unitOfWork.Assessments.GetAllAsync();
+            
+            // Get visibility settings for this section
+            var visibilitySettings = await _unitOfWork.AssessmentVisibilities.GetBySectionIdAsync(sectionId);
+            var visibilityDict = visibilitySettings.ToDictionary(av => av.AssessmentId, av => av.IsVisible);
+
+            // Filter assessments that are visible (default to visible if no setting exists)
+            var visibleAssessments = allAssessments
+                .Where(assessment => visibilityDict.GetValueOrDefault(assessment.AssessmentID, true))
+                .Select((assessment, index) => new StudentAssessmentVisibilityDto
+                {
+                    AssessmentVisibilityId = index + 1,
+                    AssessmentId = assessment.AssessmentID,
+                    SectionId = sectionId,
+                    IsVisible = true, // Only showing visible ones
+                    Assessment = new StudentAssessmentDto
+                    {
+                        AssessmentId = assessment.AssessmentID,
+                        Title = assessment.Title,
+                        Description = assessment.Description,
+                        DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
+                        MaxScore = 100 // Default since Assessment model doesn't have MaxScore
+                    }
+                }).ToList();
 
             var sectionDto = new StudentSectionDto
             {
@@ -66,30 +92,14 @@ namespace backend.Controllers
                         Email = instructor.User?.Email ?? ""
                     }
                 },
-                AssessmentVisibilities = section.AssessmentVisibilities?
-                    .Where(av => av.IsVisible && av.Assessment != null)
-                    .Select((av, index) => new StudentAssessmentVisibilityDto
-                    {
-                        AssessmentVisibilityId = index + 1, // Since there's no ID in the model, use index
-                        AssessmentId = av.AssessmentId,
-                        SectionId = av.SectionId,
-                        IsVisible = av.IsVisible,
-                        Assessment = new StudentAssessmentDto
-                        {
-                            AssessmentId = av.Assessment.AssessmentID,
-                            Title = av.Assessment.Title,
-                            Description = av.Assessment.Description,
-                            DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
-                            MaxScore = 100 // Default since Assessment model doesn't have MaxScore
-                        }
-                    }).ToList() ?? new List<StudentAssessmentVisibilityDto>()
+                AssessmentVisibilities = visibleAssessments
             };
 
             return Ok(sectionDto);
         }
 
         // GET: api/student/sections/current
-        [HttpGet("sections/current")] // For debugging: to check if the issue is with authorization
+        [HttpGet("sections/current")]
         public async Task<ActionResult<StudentSectionDto>> GetCurrentStudentSection()
         {
             try
@@ -102,9 +112,6 @@ namespace backend.Controllers
                 var hasStudentRole = User.IsInRole("Student");
                 if (!hasStudentRole)
                 {
-                    // The user is authenticated but does not have the "Student" role.
-                    // This is the likely cause of the 403 Forbidden error.
-                    // Let's return the claims for debugging.
                     var claims = User.Claims.Select(c => new { c.Type, c.Value });
                     return new JsonResult(new { message = "User does not have 'Student' role.", claims }) { StatusCode = 403 };
                 }
@@ -115,13 +122,8 @@ namespace backend.Controllers
                 {
                     return NotFound("You are not enrolled in any section.");
                 }
-                
-                if (sectionId == 0)
-                {
-                    return NotFound("You are not enrolled in any section.");
-                }
 
-                var section = await _unitOfWork.Sections.GetSectionWithAssessmentVisibilitiesAsync(sectionId);
+                var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
 
                 if (section == null)
                 {
@@ -130,6 +132,32 @@ namespace backend.Controllers
 
                 // Get instructor details separately
                 var instructor = await _unitOfWork.Instructors.GetInstructorWithUserAsync(section.InstructorId);
+
+                // Get all assessments (globally available)
+                var allAssessments = await _unitOfWork.Assessments.GetAllAsync();
+                
+                // Get visibility settings for this section
+                var visibilitySettings = await _unitOfWork.AssessmentVisibilities.GetBySectionIdAsync(sectionId);
+                var visibilityDict = visibilitySettings.ToDictionary(av => av.AssessmentId, av => av.IsVisible);
+
+                // Filter assessments that are visible (default to visible if no setting exists)
+                var visibleAssessments = allAssessments
+                    .Where(assessment => visibilityDict.GetValueOrDefault(assessment.AssessmentID, true))
+                    .Select((assessment, index) => new StudentAssessmentVisibilityDto
+                    {
+                        AssessmentVisibilityId = index + 1,
+                        AssessmentId = assessment.AssessmentID,
+                        SectionId = sectionId,
+                        IsVisible = true, // Only showing visible ones
+                        Assessment = new StudentAssessmentDto
+                        {
+                            AssessmentId = assessment.AssessmentID,
+                            Title = assessment.Title,
+                            Description = assessment.Description,
+                            DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
+                            MaxScore = 100 // Default since Assessment model doesn't have MaxScore
+                        }
+                    }).ToList();
 
                 var sectionDto = new StudentSectionDto
                 {
@@ -145,30 +173,13 @@ namespace backend.Controllers
                             Email = instructor.User?.Email ?? ""
                         }
                     },
-                    AssessmentVisibilities = section.AssessmentVisibilities?
-                        .Where(av => av.IsVisible && av.Assessment != null)
-                        .Select((av, index) => new StudentAssessmentVisibilityDto
-                        {
-                            AssessmentVisibilityId = index + 1, // Since there's no ID in the model, use index
-                            AssessmentId = av.AssessmentId,
-                            SectionId = av.SectionId,
-                            IsVisible = av.IsVisible,
-                            Assessment = new StudentAssessmentDto
-                            {
-                                AssessmentId = av.Assessment.AssessmentID,
-                                Title = av.Assessment.Title,
-                                Description = av.Assessment.Description,
-                                DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
-                                MaxScore = 100 // Default since Assessment model doesn't have MaxScore
-                            }
-                        }).ToList() ?? new List<StudentAssessmentVisibilityDto>()
+                    AssessmentVisibilities = visibleAssessments
                 };
 
                 return Ok(sectionDto);
             }
             catch (Exception ex)
             {
-                // Return detailed error information for debugging
                 return StatusCode(500, new { 
                     message = "Internal server error", 
                     error = ex.Message, 
@@ -217,6 +228,174 @@ namespace backend.Controllers
             if (string.IsNullOrWhiteSpace(sectionIdClaim)) return 0;
             if (int.TryParse(sectionIdClaim, out var secId)) return secId;
             return 0;
+        }
+
+        // POST: api/student/results
+        [HttpPost("results")]
+        public async Task<ActionResult<backend.Dtos.Assessment.ResultDto>> SubmitResult([FromBody] backend.Dtos.Assessment.SubmitResultDto submitResultDto)
+        {
+            try
+            {
+                var studentId = GetCurrentStudentId();
+                if (studentId == 0)
+                {
+                    return BadRequest("Student ID not found in token.");
+                }
+
+                // Check if assessment exists and is visible to the student
+                var sectionId = GetCurrentSectionId();
+                var assessment = await _unitOfWork.Assessments.GetByIdAsync(submitResultDto.AssessmentId);
+                if (assessment == null)
+                {
+                    return NotFound("Assessment not found.");
+                }
+
+                // Check if assessment is visible for this section
+                var visibility = await _unitOfWork.AssessmentVisibilities.GetBySectionAndAssessmentAsync(sectionId, submitResultDto.AssessmentId);
+                if (visibility != null && !visibility.IsVisible)
+                {
+                    return Forbid("This assessment is not available for your section.");
+                }
+
+                // Check if student already has a result for this assessment
+                var existingResult = await _unitOfWork.Results.GetResultByStudentAndAssessmentAsync(studentId, submitResultDto.AssessmentId);
+                
+                if (existingResult != null)
+                {
+                    // Update existing result (retake)
+                    existingResult.Score = submitResultDto.Score;
+                    existingResult.Date = submitResultDto.DateTaken;
+                    
+                    await _unitOfWork.Results.UpdateAsync(existingResult);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    var updatedResultDto = new backend.Dtos.Assessment.ResultDto
+                    {
+                        ResultId = existingResult.ResultId,
+                        StudentId = studentId,
+                        AssessmentId = submitResultDto.AssessmentId,
+                        AssessmentTitle = assessment.Title,
+                        Score = existingResult.Score,
+                        DateTaken = existingResult.Date,
+                        StudentName = User.FindFirst("FullName")?.Value ?? "",
+                        MatricNo = User.FindFirst("MatricNo")?.Value ?? ""
+                    };
+
+                    return Ok(updatedResultDto);
+                }
+                else
+                {
+                    // Create new result
+                    var newResult = new Result
+                    {
+                        StudentId = studentId,
+                        AssessmentId = submitResultDto.AssessmentId,
+                        Score = submitResultDto.Score,
+                        Date = submitResultDto.DateTaken
+                    };
+
+                    await _unitOfWork.Results.AddAsync(newResult);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    var resultDto = new backend.Dtos.Assessment.ResultDto
+                    {
+                        ResultId = newResult.ResultId,
+                        StudentId = studentId,
+                        AssessmentId = submitResultDto.AssessmentId,
+                        AssessmentTitle = assessment.Title,
+                        Score = newResult.Score,
+                        DateTaken = newResult.Date,
+                        StudentName = User.FindFirst("FullName")?.Value ?? "",
+                        MatricNo = User.FindFirst("MatricNo")?.Value ?? ""
+                    };
+
+                    return CreatedAtAction(nameof(GetResult), new { resultId = newResult.ResultId }, resultDto);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    message = "Internal server error", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // GET: api/student/results/{resultId}
+        [HttpGet("results/{resultId}")]
+        public async Task<ActionResult<backend.Dtos.Assessment.ResultDto>> GetResult(int resultId)
+        {
+            try
+            {
+                var studentId = GetCurrentStudentId();
+                var result = await _unitOfWork.Results.GetByIdAsync(resultId);
+
+                if (result == null)
+                {
+                    return NotFound("Result not found.");
+                }
+
+                // Ensure student can only access their own results
+                if (result.StudentId != studentId)
+                {
+                    return Forbid("You can only access your own results.");
+                }
+
+                var assessment = await _unitOfWork.Assessments.GetByIdAsync(result.AssessmentId);
+
+                var resultDto = new backend.Dtos.Assessment.ResultDto
+                {
+                    ResultId = result.ResultId,
+                    StudentId = result.StudentId,
+                    AssessmentId = result.AssessmentId,
+                    AssessmentTitle = assessment?.Title ?? "",
+                    Score = result.Score,
+                    DateTaken = result.Date,
+                    StudentName = User.FindFirst("FullName")?.Value ?? "",
+                    MatricNo = User.FindFirst("MatricNo")?.Value ?? ""
+                };
+
+                return Ok(resultDto);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    message = "Internal server error", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // GET: api/student/results
+        [HttpGet("results")]
+        public async Task<ActionResult<IEnumerable<backend.Dtos.Assessment.ResultDto>>> GetMyResults()
+        {
+            try
+            {
+                var studentId = GetCurrentStudentId();
+                var results = await _unitOfWork.Results.GetResultsByStudentIdAsync(studentId);
+
+                var resultDtos = results.Select(r => new backend.Dtos.Assessment.ResultDto
+                {
+                    ResultId = r.ResultId,
+                    StudentId = r.StudentId,
+                    AssessmentId = r.AssessmentId,
+                    AssessmentTitle = r.Assessment?.Title ?? "",
+                    Score = r.Score,
+                    DateTaken = r.Date,
+                    StudentName = User.FindFirst("FullName")?.Value ?? "",
+                    MatricNo = User.FindFirst("MatricNo")?.Value ?? ""
+                }).ToList();
+
+                return Ok(resultDtos);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    message = "Internal server error", 
+                    error = ex.Message 
+                });
+            }
         }
 
         // GET: api/student

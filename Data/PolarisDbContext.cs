@@ -61,7 +61,8 @@ namespace backend.Data
         modelBuilder.Entity<Result>()
             .HasOne(r => r.Assessment)
             .WithMany(a => a.Results)
-            .HasForeignKey(r => r.AssessmentId);
+            .HasForeignKey(r => r.AssessmentId)
+            .HasPrincipalKey(a => a.AssessmentID);
 
         modelBuilder.Entity<SectionAssessmentVisibility>()
             .HasKey(sav => new { sav.SectionId, sav.AssessmentId });

@@ -126,8 +126,8 @@ namespace backend.Controllers
                             {
                                 AssessmentId = r.Assessment?.AssessmentID ?? 0,
                                 AssessmentTitle = r.Assessment?.Title ?? "",
-                                Score = (decimal)r.Score,  // Explicit cast from float to decimal
-                                DateTaken = r.Date  // Changed from SubmissionDate to Date
+                                Score = r.Score,
+                                DateTaken = r.Date
                             })
                             .ToList() ?? new List<ResultDto>()
                     })
@@ -148,17 +148,49 @@ namespace backend.Controllers
             try
             {
                 var instructorId = GetCurrentInstructorId();
-                var section = await _unitOfWork.Sections.GetSectionWithAssessmentVisibilitiesAsync(sectionId);
+                var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
 
-                if (section == null || section.InstructorId != instructorId)
+                if (section == null)
                 {
-                    return NotFound(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Section not found or you don't have access to it."));
+                    return NotFound(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Section not found."));
                 }
 
-                return Ok(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.SuccessResponse(section.AssessmentVisibilities, "Assessment visibilities retrieved successfully"));
+                if (section.InstructorId != instructorId)
+                {
+                    return Forbid(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("You don't have access to this section.").ToString());
+                }
+
+                // Get all assessments (they're globally available)
+                var allAssessments = await _unitOfWork.Assessments.GetAllAsync();
+                
+                // Get existing visibility settings for this section
+                var existingVisibilities = await _unitOfWork.AssessmentVisibilities.GetBySectionIdAsync(sectionId);
+                var visibilityDict = existingVisibilities.ToDictionary(av => av.AssessmentId, av => av.IsVisible);
+
+                // Create assessment visibility objects for all assessments
+                var assessmentVisibilities = allAssessments.Select(assessment =>
+                {
+                    // Default to visible if no explicit visibility record exists
+                    var isVisible = visibilityDict.GetValueOrDefault(assessment.AssessmentID, true);
+                    
+                    return new SectionAssessmentVisibility
+                    {
+                        SectionId = sectionId,
+                        AssessmentId = assessment.AssessmentID,
+                        IsVisible = isVisible,
+                        Assessment = assessment
+                    };
+                }).ToList();
+
+                return Ok(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.SuccessResponse(assessmentVisibilities, "Assessment visibilities retrieved successfully"));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Unauthorized access", ex.Message));
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error in GetAssessmentVisibilities: {ex.Message}");
                 return StatusCode(500, ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Failed to retrieve assessment visibilities", ex.Message));
             }
         }
@@ -177,29 +209,57 @@ namespace backend.Controllers
                     return NotFound(ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Section not found or you don't have access to it."));
                 }
 
+                // Verify the assessment exists
+                var assessment = await _unitOfWork.Assessments.GetByIdAsync(assessmentId);
+                if (assessment == null)
+                {
+                    return NotFound(ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Assessment not found."));
+                }
+
                 var visibility = await _unitOfWork.AssessmentVisibilities.GetBySectionAndAssessmentAsync(sectionId, assessmentId);
 
                 if (visibility == null)
                 {
-                    visibility = new SectionAssessmentVisibility
+                    // Only create a record if setting to non-default (false)
+                    // Default is true (visible), so only store when hiding
+                    if (!isVisible)
                     {
-                        SectionId = sectionId,
-                        AssessmentId = assessmentId,
-                        IsVisible = isVisible
-                    };
-                    await _unitOfWork.AssessmentVisibilities.AddAsync(visibility);
+                        visibility = new SectionAssessmentVisibility
+                        {
+                            SectionId = sectionId,
+                            AssessmentId = assessmentId,
+                            IsVisible = false
+                        };
+                        await _unitOfWork.AssessmentVisibilities.AddAsync(visibility);
+                    }
+                    // If setting to visible (default), no need to store a record
                 }
                 else
                 {
+                    // Update existing record
                     visibility.IsVisible = isVisible;
                     await _unitOfWork.AssessmentVisibilities.UpdateAsync(visibility);
+                    
+                    // If setting back to default (visible), we can optionally delete the record
+                    // to keep the database clean, but keeping it for audit trail
                 }
 
                 await _unitOfWork.SaveChangesAsync();
-                return Ok(ApiResponse<SectionAssessmentVisibility>.SuccessResponse(visibility, "Assessment visibility updated successfully"));
+                
+                // Return the effective visibility status
+                var result = new SectionAssessmentVisibility
+                {
+                    SectionId = sectionId,
+                    AssessmentId = assessmentId,
+                    IsVisible = isVisible,
+                    Assessment = assessment
+                };
+                
+                return Ok(ApiResponse<SectionAssessmentVisibility>.SuccessResponse(result, "Assessment visibility updated successfully"));
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error updating assessment visibility: {ex.Message}");
                 return StatusCode(500, ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Failed to update assessment visibility", ex.Message));
             }
         }

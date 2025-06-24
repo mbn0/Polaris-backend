@@ -19,6 +19,7 @@ namespace backend.Repositories.Implementations
                     .ThenInclude(student => student.User)
                 .Include(s => s.AssessmentVisibilities)
                     .ThenInclude(av => av.Assessment)
+                .AsSplitQuery()
                 .ToListAsync();
         }
 
@@ -38,6 +39,7 @@ namespace backend.Repositories.Implementations
                 .Include(s => s.Students!)
                     .ThenInclude(student => student.Results!)
                         .ThenInclude(result => result.Assessment)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(s => s.SectionId == sectionId);
         }
 
@@ -59,6 +61,7 @@ namespace backend.Repositories.Implementations
                     .ThenInclude(student => student.Results)
                 .Include(s => s.AssessmentVisibilities)
                     .ThenInclude(av => av.Assessment)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync();
         }
 
@@ -69,6 +72,7 @@ namespace backend.Repositories.Implementations
                     .ThenInclude(i => i!.User)
                 .Include(s => s.Students!)
                     .ThenInclude(st => st.User)
+                .AsSplitQuery()
                 .ToListAsync();
         }
     }
