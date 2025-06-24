@@ -84,21 +84,32 @@ namespace backend.Controllers
         [HttpPost("sections")]
         public async Task<ActionResult<CreateSectionResponseDto>> CreateSection([FromBody] CreateSectionDto dto)
         {
-            // Verify instructor exists
-            var instructor = await _unitOfWork.Instructors.GetByUserIdAsync(dto.InstructorUserId);
-            if (instructor == null)
-                return BadRequest("Instructor not found");
-
-            var sec = new Section { InstructorId = instructor.InstructorId };
-            await _unitOfWork.Sections.AddAsync(sec);
-            await _unitOfWork.SaveChangesAsync();
-
-            return new CreateSectionResponseDto
+            try
             {
-                Id = sec.SectionId,
-                InstructorId = instructor.InstructorId,
-                InstructorUserId = instructor.UserId
-            };
+                // Verify instructor exists
+                var instructor = await _unitOfWork.Instructors.GetByUserIdAsync(dto.InstructorUserId);
+                if (instructor == null)
+                    return BadRequest("Instructor not found");
+
+                var sec = new Section { InstructorId = instructor.InstructorId };
+                await _unitOfWork.Sections.AddAsync(sec);
+                await _unitOfWork.SaveChangesAsync();
+
+                // No need to create assessment visibilities - assessments are globally available
+                // Visibility records are only created when instructors explicitly change visibility
+
+                return new CreateSectionResponseDto
+                {
+                    Id = sec.SectionId,
+                    InstructorId = instructor.InstructorId,
+                    InstructorUserId = instructor.UserId
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating section: {ex.Message}");
+                return StatusCode(500, $"Internal server error while creating section: {ex.Message}");
+            }
         }
 
         [HttpPut("sections/{id}")]
@@ -123,6 +134,22 @@ namespace backend.Controllers
             var sec = await _unitOfWork.Sections.GetByIdAsync(id);
             if (sec == null) return NotFound();
             
+            // Remove students from this section (set their SectionId to null)
+            var studentsInSection = await _unitOfWork.Students.FindAsync(s => s.SectionId == id);
+            foreach (var student in studentsInSection)
+            {
+                student.SectionId = null;
+                await _unitOfWork.Students.UpdateAsync(student);
+            }
+            
+            // Delete related SectionAssessmentVisibility records
+            var visibilityRecords = await _unitOfWork.AssessmentVisibilities.GetBySectionIdAsync(id);
+            foreach (var visibility in visibilityRecords)
+            {
+                await _unitOfWork.AssessmentVisibilities.DeleteAsync(visibility);
+            }
+            
+            // Now we can safely delete the section
             await _unitOfWork.Sections.DeleteAsync(sec);
             await _unitOfWork.SaveChangesAsync();
             return NoContent();
@@ -422,28 +449,52 @@ namespace backend.Controllers
         [HttpPost("test-data")]
         public async Task<ActionResult> CreateTestData()
         {
-            // Create a test assessment
-            var assessment = new Assessment
+            try
             {
-                Title = "Cryptography Quiz 1",
-                Description = "Basic cryptography concepts including symmetric and asymmetric encryption, hashing, and digital signatures."
-            };
-            
-            await _unitOfWork.Assessments.AddAsync(assessment);
-            await _unitOfWork.SaveChangesAsync();
+                // Create test assessments if none exist
+                var existingAssessments = await _unitOfWork.Assessments.GetAllAsync();
+                if (!existingAssessments.Any())
+                {
+                    var assessments = new List<Assessment>
+                    {
+                        new Assessment
+                        {
+                            Title = "Introduction to Cryptography Quiz",
+                            Description = "Basic concepts of cryptography including symmetric and asymmetric encryption, hashing, and digital signatures."
+                        },
+                        new Assessment
+                        {
+                            Title = "AES Encryption Assignment",
+                            Description = "Practical exercise on Advanced Encryption Standard implementation and analysis."
+                        },
+                        new Assessment
+                        {
+                            Title = "RSA Key Generation Lab",
+                            Description = "Hands-on lab for understanding RSA key pair generation and digital signatures."
+                        },
+                        new Assessment
+                        {
+                            Title = "Hash Functions and MAC",
+                            Description = "Assessment covering cryptographic hash functions and message authentication codes."
+                        },
+                        new Assessment
+                        {
+                            Title = "PKI and Digital Certificates",
+                            Description = "Comprehensive exam on Public Key Infrastructure and certificate management."
+                        }
+                    };
 
-            // Make it visible for section 2
-            var visibility = new SectionAssessmentVisibility
+                    await _unitOfWork.Assessments.AddRangeAsync(assessments);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
+                return Ok(new { message = "Test assessments created successfully" });
+            }
+            catch (Exception ex)
             {
-                SectionId = 2,
-                AssessmentId = assessment.AssessmentID,
-                IsVisible = true
-            };
-
-            await _unitOfWork.AssessmentVisibilities.AddAsync(visibility);
-            await _unitOfWork.SaveChangesAsync();
-
-            return Ok(new { message = "Test data created successfully", assessmentId = assessment.AssessmentID });
+                Console.WriteLine($"Error creating test data: {ex.Message}");
+                return StatusCode(500, "Internal server error while creating test data");
+            }
         }
     }
 }

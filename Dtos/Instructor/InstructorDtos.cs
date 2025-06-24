@@ -30,7 +30,7 @@ namespace backend.Dtos.Instructor
     {
         public int AssessmentId { get; set; }
         public string AssessmentTitle { get; set; } = string.Empty;
-        public decimal Score { get; set; }
+        public float Score { get; set; }
         public DateTime DateTaken { get; set; }
     }
 } 
