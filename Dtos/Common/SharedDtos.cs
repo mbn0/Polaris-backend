@@ -61,6 +61,8 @@ namespace backend.Dtos.Common
         /// </summary>
         public string? Password { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
+        public string? MatricNo   { get; set; }
+        public int? SectionId     { get; set; }
     }
 
     public class UpdatePasswordDto

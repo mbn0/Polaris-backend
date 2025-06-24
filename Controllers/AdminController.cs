@@ -199,7 +199,8 @@ namespace backend.Controllers
             {
                 InstructorId = i.InstructorId,
                 FullName = i.User?.FullName ?? "",
-                // Add any additional properties needed from the Admin version
+                UserId = i.UserId,
+                Email = i.User?.Email ?? ""
             }).ToList();
         }
 
@@ -259,50 +260,124 @@ namespace backend.Controllers
         [HttpPut("users/{id}")]
         public async Task<ActionResult> UpdateUser(string id, [FromBody] UpdateUserDto dto)
         {
-            var u = await _userManager.FindByIdAsync(id);
-            if (u == null) return NotFound();
-
-            // Update basic user properties
-            u.Email = dto.Email;
-            u.UserName = dto.Email;
-            u.FullName = dto.FullName;
-            
-            // Only update password if it's provided
-            if (!string.IsNullOrEmpty(dto.Password))
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                // Remove existing password and add new one
-                var removePasswordResult = await _userManager.RemovePasswordAsync(u);
-                if (removePasswordResult.Succeeded)
+                var u = await _userManager.FindByIdAsync(id);
+                if (u == null)
                 {
-                    var addPasswordResult = await _userManager.AddPasswordAsync(u, dto.Password);
-                    if (!addPasswordResult.Succeeded)
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return NotFound();
+                }
+
+                // Update basic user properties
+                u.Email = dto.Email;
+                u.UserName = dto.Email;
+                u.FullName = dto.FullName;
+                
+                // Only update password if it's provided
+                if (!string.IsNullOrEmpty(dto.Password))
+                {
+                    // Remove existing password and add new one
+                    var removePasswordResult = await _userManager.RemovePasswordAsync(u);
+                    if (removePasswordResult.Succeeded)
                     {
-                        return BadRequest(new { message = "Failed to update password", errors = addPasswordResult.Errors });
+                        var addPasswordResult = await _userManager.AddPasswordAsync(u, dto.Password);
+                        if (!addPasswordResult.Succeeded)
+                        {
+                            await _unitOfWork.RollbackTransactionAsync();
+                            return BadRequest(new { message = "Failed to update password", errors = addPasswordResult.Errors });
+                        }
+                    }
+                    else
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return BadRequest(new { message = "Failed to remove existing password", errors = removePasswordResult.Errors });
                     }
                 }
-                else
+                // If password is null or empty, we keep the existing password unchanged
+
+                // Get current and new roles
+                var currentRoles = await _userManager.GetRolesAsync(u);
+                var rolesToRemove = currentRoles.Except(dto.Roles).ToList();
+                var rolesToAdd = dto.Roles.Except(currentRoles).ToList();
+
+                // Handle role-specific data before updating roles
+                // If removing Student role, remove student record
+                if (rolesToRemove.Contains("Student") && !dto.Roles.Contains("Student"))
                 {
-                    return BadRequest(new { message = "Failed to remove existing password", errors = removePasswordResult.Errors });
+                    var student = await _unitOfWork.Students.GetByUserIdAsync(id);
+                    if (student != null)
+                    {
+                        await _unitOfWork.Students.DeleteAsync(student);
+                    }
                 }
+
+                // If removing Instructor role, remove instructor record
+                if (rolesToRemove.Contains("Instructor") && !dto.Roles.Contains("Instructor"))
+                {
+                    var instructor = await _unitOfWork.Instructors.GetByUserIdAsync(id);
+                    if (instructor != null)
+                    {
+                        await _unitOfWork.Instructors.DeleteAsync(instructor);
+                    }
+                }
+
+                // If adding Student role, create student record
+                if (rolesToAdd.Contains("Student") && !currentRoles.Contains("Student"))
+                {
+                    var existingStudent = await _unitOfWork.Students.GetByUserIdAsync(id);
+                    if (existingStudent == null)
+                    {
+                        await _unitOfWork.Students.AddAsync(new Student
+                        {
+                            UserId = id,
+                            MatricNo = dto.MatricNo ?? $"TEMP_{DateTime.Now.Ticks}", // Generate temp matric number if not provided
+                            SectionId = dto.SectionId
+                        });
+                    }
+                }
+
+                // If adding Instructor role, create instructor record
+                if (rolesToAdd.Contains("Instructor") && !currentRoles.Contains("Instructor"))
+                {
+                    var existingInstructor = await _unitOfWork.Instructors.GetByUserIdAsync(id);
+                    if (existingInstructor == null)
+                    {
+                        await _unitOfWork.Instructors.AddAsync(new Instructor
+                        {
+                            UserId = id
+                        });
+                    }
+                }
+
+                // Update user roles
+                if (rolesToRemove.Any())
+                {
+                    await _userManager.RemoveFromRolesAsync(u, rolesToRemove);
+                }
+                if (rolesToAdd.Any())
+                {
+                    await _userManager.AddToRolesAsync(u, rolesToAdd);
+                }
+
+                // Update the user in Identity
+                var updateResult = await _userManager.UpdateAsync(u);
+                if (!updateResult.Succeeded)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return BadRequest(new { message = "Failed to update user", errors = updateResult.Errors });
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+                return NoContent();
             }
-            // If password is null or empty, we keep the existing password unchanged
-
-            // Update user roles
-            var currentRoles = await _userManager.GetRolesAsync(u);
-            // remove outdated roles
-            await _userManager.RemoveFromRolesAsync(u, currentRoles.Except(dto.Roles));
-            // add new roles
-            await _userManager.AddToRolesAsync(u, dto.Roles.Except(currentRoles));
-
-            // Update the user in Identity
-            var updateResult = await _userManager.UpdateAsync(u);
-            if (!updateResult.Succeeded)
+            catch (Exception)
             {
-                return BadRequest(new { message = "Failed to update user", errors = updateResult.Errors });
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
-
-            await _unitOfWork.SaveChangesAsync();
-            return NoContent();
         }
 
         [HttpPut("users/{id}/password")]
@@ -342,6 +417,33 @@ namespace backend.Controllers
             var delRes = await _userManager.DeleteAsync(u);
             if (!delRes.Succeeded) return StatusCode(500, delRes.Errors);
             return NoContent();
+        }
+
+        [HttpPost("test-data")]
+        public async Task<ActionResult> CreateTestData()
+        {
+            // Create a test assessment
+            var assessment = new Assessment
+            {
+                Title = "Cryptography Quiz 1",
+                Description = "Basic cryptography concepts including symmetric and asymmetric encryption, hashing, and digital signatures."
+            };
+            
+            await _unitOfWork.Assessments.AddAsync(assessment);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Make it visible for section 2
+            var visibility = new SectionAssessmentVisibility
+            {
+                SectionId = 2,
+                AssessmentId = assessment.AssessmentID,
+                IsVisible = true
+            };
+
+            await _unitOfWork.AssessmentVisibilities.AddAsync(visibility);
+            await _unitOfWork.SaveChangesAsync();
+
+            return Ok(new { message = "Test data created successfully", assessmentId = assessment.AssessmentID });
         }
     }
 }

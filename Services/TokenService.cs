@@ -49,7 +49,10 @@ namespace backend.Services
                     {
                         claims.Add(new Claim("StudentId", student.StudentId.ToString()));
                         claims.Add(new Claim("MatricNo", student.MatricNo));
-                        claims.Add(new Claim("SectionId", student.SectionId.ToString() ?? ""));
+                        if (student.SectionId.HasValue)
+                        {
+                            claims.Add(new Claim("SectionId", student.SectionId.Value.ToString()));
+                        }
                     }
                 }
                 else if (role == "Instructor")
