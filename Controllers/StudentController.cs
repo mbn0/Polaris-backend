@@ -55,80 +55,127 @@ namespace backend.Controllers
             var sectionDto = new StudentSectionDto
             {
                 SectionId = section.SectionId,
-                Instructor = instructor == null ? null : new InstructorDto
+                Instructor = instructor == null ? null : new StudentInstructorDto
                 {
                     InstructorId = instructor.InstructorId,
-                    FullName = instructor.User?.FullName
-                },
-                Assessments = section.AssessmentVisibilities?
-                    .Where(av => av.IsVisible)
-                    .Select(av => new AssessmentDto
+                    UserId = instructor.UserId,
+                    User = new StudentUserDto
                     {
-                        AssessmentID = av.Assessment.AssessmentID,
-                        Title = av.Assessment.Title,
-                        Description = av.Assessment.Description
-                    }).ToList() ?? new List<AssessmentDto>()
+                        Id = instructor.UserId,
+                        FullName = instructor.User?.FullName ?? "",
+                        Email = instructor.User?.Email ?? ""
+                    }
+                },
+                AssessmentVisibilities = section.AssessmentVisibilities?
+                    .Where(av => av.IsVisible && av.Assessment != null)
+                    .Select((av, index) => new StudentAssessmentVisibilityDto
+                    {
+                        AssessmentVisibilityId = index + 1, // Since there's no ID in the model, use index
+                        AssessmentId = av.AssessmentId,
+                        SectionId = av.SectionId,
+                        IsVisible = av.IsVisible,
+                        Assessment = new StudentAssessmentDto
+                        {
+                            AssessmentId = av.Assessment.AssessmentID,
+                            Title = av.Assessment.Title,
+                            Description = av.Assessment.Description,
+                            DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
+                            MaxScore = 100 // Default since Assessment model doesn't have MaxScore
+                        }
+                    }).ToList() ?? new List<StudentAssessmentVisibilityDto>()
             };
 
             return Ok(sectionDto);
         }
 
         // GET: api/student/sections/current
-        [HttpGet("sections/current")]
-        [AllowAnonymous] // For debugging: to check if the issue is with authorization
+        [HttpGet("sections/current")] // For debugging: to check if the issue is with authorization
         public async Task<ActionResult<StudentSectionDto>> GetCurrentStudentSection()
         {
-            if (User.Identity?.IsAuthenticated == false)
+            try
             {
-                return Unauthorized("User is not authenticated. Please provide a valid token to debug claims.");
-            }
-
-            var hasStudentRole = User.IsInRole("Student");
-            if (!hasStudentRole)
-            {
-                // The user is authenticated but does not have the "Student" role.
-                // This is the likely cause of the 403 Forbidden error.
-                // Let's return the claims for debugging.
-                var claims = User.Claims.Select(c => new { c.Type, c.Value });
-                return new JsonResult(new { message = "User does not have 'Student' role.", claims }) { StatusCode = 403 };
-            }
-            
-            var sectionId = GetCurrentSectionId();
-            
-            if (sectionId == 0)
-            {
-                return NotFound("You are not enrolled in any section.");
-            }
-
-            var section = await _unitOfWork.Sections.GetSectionWithAssessmentVisibilitiesAsync(sectionId);
-
-            if (section == null)
-            {
-                return NotFound("Section not found.");
-            }
-
-            // Get instructor details separately
-            var instructor = await _unitOfWork.Instructors.GetInstructorWithUserAsync(section.InstructorId);
-
-            var sectionDto = new StudentSectionDto
-            {
-                SectionId = section.SectionId,
-                Instructor = instructor == null ? null : new InstructorDto
+                if (User.Identity?.IsAuthenticated == false)
                 {
-                    InstructorId = instructor.InstructorId,
-                    FullName = instructor.User?.FullName
-                },
-                Assessments = section.AssessmentVisibilities?
-                    .Where(av => av.IsVisible)
-                    .Select(av => new AssessmentDto
-                    {
-                        AssessmentID = av.Assessment.AssessmentID,
-                        Title = av.Assessment.Title,
-                        Description = av.Assessment.Description
-                    }).ToList() ?? new List<AssessmentDto>()
-            };
+                    return Unauthorized("User is not authenticated. Please provide a valid token to debug claims.");
+                }
 
-            return Ok(sectionDto);
+                var hasStudentRole = User.IsInRole("Student");
+                if (!hasStudentRole)
+                {
+                    // The user is authenticated but does not have the "Student" role.
+                    // This is the likely cause of the 403 Forbidden error.
+                    // Let's return the claims for debugging.
+                    var claims = User.Claims.Select(c => new { c.Type, c.Value });
+                    return new JsonResult(new { message = "User does not have 'Student' role.", claims }) { StatusCode = 403 };
+                }
+                
+                var sectionId = GetCurrentSectionId();
+                
+                if (sectionId == 0)
+                {
+                    return NotFound("You are not enrolled in any section.");
+                }
+                
+                if (sectionId == 0)
+                {
+                    return NotFound("You are not enrolled in any section.");
+                }
+
+                var section = await _unitOfWork.Sections.GetSectionWithAssessmentVisibilitiesAsync(sectionId);
+
+                if (section == null)
+                {
+                    return NotFound("Section not found.");
+                }
+
+                // Get instructor details separately
+                var instructor = await _unitOfWork.Instructors.GetInstructorWithUserAsync(section.InstructorId);
+
+                var sectionDto = new StudentSectionDto
+                {
+                    SectionId = section.SectionId,
+                    Instructor = instructor == null ? null : new StudentInstructorDto
+                    {
+                        InstructorId = instructor.InstructorId,
+                        UserId = instructor.UserId,
+                        User = new StudentUserDto
+                        {
+                            Id = instructor.UserId,
+                            FullName = instructor.User?.FullName ?? "",
+                            Email = instructor.User?.Email ?? ""
+                        }
+                    },
+                    AssessmentVisibilities = section.AssessmentVisibilities?
+                        .Where(av => av.IsVisible && av.Assessment != null)
+                        .Select((av, index) => new StudentAssessmentVisibilityDto
+                        {
+                            AssessmentVisibilityId = index + 1, // Since there's no ID in the model, use index
+                            AssessmentId = av.AssessmentId,
+                            SectionId = av.SectionId,
+                            IsVisible = av.IsVisible,
+                            Assessment = new StudentAssessmentDto
+                            {
+                                AssessmentId = av.Assessment.AssessmentID,
+                                Title = av.Assessment.Title,
+                                Description = av.Assessment.Description,
+                                DueDate = DateTime.Now.AddDays(7), // Default since Assessment model doesn't have DueDate
+                                MaxScore = 100 // Default since Assessment model doesn't have MaxScore
+                            }
+                        }).ToList() ?? new List<StudentAssessmentVisibilityDto>()
+                };
+
+                return Ok(sectionDto);
+            }
+            catch (Exception ex)
+            {
+                // Return detailed error information for debugging
+                return StatusCode(500, new { 
+                    message = "Internal server error", 
+                    error = ex.Message, 
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message
+                });
+            }
         }
 
         // GET: api/student/profile
@@ -167,7 +214,9 @@ namespace backend.Controllers
         private int GetCurrentSectionId()
         {
             var sectionIdClaim = User.FindFirst("SectionId")?.Value;
-            return !string.IsNullOrEmpty(sectionIdClaim) ? int.Parse(sectionIdClaim) : 0;
+            if (string.IsNullOrWhiteSpace(sectionIdClaim)) return 0;
+            if (int.TryParse(sectionIdClaim, out var secId)) return secId;
+            return 0;
         }
 
         // GET: api/student
