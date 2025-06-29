@@ -130,6 +130,13 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+// Seed roles on startup
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await SeedRolesAsync(roleManager);
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -154,3 +161,17 @@ app.UseAuthorization(); // if using [Authorize] somewhere
 app.MapControllers();   // required for route mapping
 
 app.Run();
+
+// Role seeding method
+static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
+{
+    string[] roles = { "Admin", "Instructor", "Student" };
+
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
+    }
+}

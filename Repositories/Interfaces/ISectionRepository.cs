@@ -10,5 +10,6 @@ namespace backend.Repositories.Interfaces
         Task<Section?> GetSectionWithAssessmentVisibilitiesAsync(int sectionId);
         Task<Section?> GetSectionForInstructorAsync(int sectionId, int instructorId);
         Task<IEnumerable<Section>> GetSectionsWithInstructorsAndStudentsAsync();
+        Task<IEnumerable<Section>> GetSectionsWithDetailsAsync();
     }
 } 

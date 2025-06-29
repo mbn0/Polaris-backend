@@ -122,16 +122,27 @@ namespace backend.Controllers
                         MatricNo = student.MatricNo,
                         FullName = student.User?.FullName ?? "",
                         Results = student.Results?
-                            .Select(r => new ResultDto
+                            .Select(r => new InstructorResultDto
                             {
                                 AssessmentId = r.Assessment?.AssessmentID ?? 0,
                                 AssessmentTitle = r.Assessment?.Title ?? "",
                                 Score = r.Score,
                                 DateTaken = r.Date
                             })
-                            .ToList() ?? new List<ResultDto>()
+                            .ToList() ?? new List<InstructorResultDto>()
                     })
                     .ToList() ?? new List<StudentResultDto>();
+
+// Debug logging (can be removed in production)
+                Console.WriteLine($"Debug: Found {studentResults.Count} students");
+                foreach (var student in studentResults)
+                {
+                    Console.WriteLine($"Debug: Student {student.FullName} ({student.MatricNo}) has {student.Results.Count} results");
+                    foreach (var result in student.Results)
+                    {
+                        Console.WriteLine($"Debug: - Assessment {result.AssessmentTitle}: Score {result.Score}");
+                    }
+                }
 
                 return Ok(ApiResponse<IEnumerable<StudentResultDto>>.SuccessResponse(studentResults, "Student results retrieved successfully"));
             }
@@ -143,7 +154,7 @@ namespace backend.Controllers
 
         // Get all assessment visibilities for a section
         [HttpGet("sections/{sectionId}/assessments/visibility")]
-        public async Task<ActionResult<ApiResponse<IEnumerable<SectionAssessmentVisibility>>>> GetAssessmentVisibilities(int sectionId)
+        public async Task<ActionResult<ApiResponse<IEnumerable<SectionAssessmentVisibilityDto>>>> GetAssessmentVisibilities(int sectionId)
         {
             try
             {
@@ -152,12 +163,12 @@ namespace backend.Controllers
 
                 if (section == null)
                 {
-                    return NotFound(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Section not found."));
+                    return NotFound(ApiResponse<IEnumerable<SectionAssessmentVisibilityDto>>.ErrorResponse("Section not found."));
                 }
 
                 if (section.InstructorId != instructorId)
                 {
-                    return Forbid(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("You don't have access to this section.").ToString());
+                    return Forbid("You don't have access to this section.");
                 }
 
                 // Get all assessments (they're globally available)
@@ -167,37 +178,44 @@ namespace backend.Controllers
                 var existingVisibilities = await _unitOfWork.AssessmentVisibilities.GetBySectionIdAsync(sectionId);
                 var visibilityDict = existingVisibilities.ToDictionary(av => av.AssessmentId, av => av.IsVisible);
 
-                // Create assessment visibility objects for all assessments
+                // Create assessment visibility DTOs for all assessments
                 var assessmentVisibilities = allAssessments.Select(assessment =>
                 {
                     // Default to visible if no explicit visibility record exists
                     var isVisible = visibilityDict.GetValueOrDefault(assessment.AssessmentID, true);
                     
-                    return new SectionAssessmentVisibility
+                    return new SectionAssessmentVisibilityDto
                     {
                         SectionId = sectionId,
                         AssessmentId = assessment.AssessmentID,
                         IsVisible = isVisible,
-                        Assessment = assessment
+                        Assessment = new AssessmentDto
+                        {
+                            AssessmentId = assessment.AssessmentID,
+                            Title = assessment.Title,
+                            Description = assessment.Description,
+                            MaxScore = assessment.MaxScore,
+                            DueDate = assessment.DueDate
+                        }
                     };
                 }).ToList();
 
-                return Ok(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.SuccessResponse(assessmentVisibilities, "Assessment visibilities retrieved successfully"));
+                return Ok(ApiResponse<IEnumerable<SectionAssessmentVisibilityDto>>.SuccessResponse(assessmentVisibilities, "Assessment visibilities retrieved successfully"));
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Unauthorized(ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Unauthorized access", ex.Message));
+                return Unauthorized(ApiResponse<IEnumerable<SectionAssessmentVisibilityDto>>.ErrorResponse("Unauthorized access", ex.Message));
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetAssessmentVisibilities: {ex.Message}");
-                return StatusCode(500, ApiResponse<IEnumerable<SectionAssessmentVisibility>>.ErrorResponse("Failed to retrieve assessment visibilities", ex.Message));
+                return StatusCode(500, ApiResponse<IEnumerable<SectionAssessmentVisibilityDto>>.ErrorResponse("Failed to retrieve assessment visibilities", ex.Message));
             }
         }
 
         // Update assessment visibility for a section
         [HttpPut("sections/{sectionId}/assessments/{assessmentId}/visibility")]
-        public async Task<ActionResult<ApiResponse<SectionAssessmentVisibility>>> UpdateAssessmentVisibility(int sectionId, int assessmentId, [FromBody] bool isVisible)
+        public async Task<ActionResult<ApiResponse<SectionAssessmentVisibilityDto>>> UpdateAssessmentVisibility(int sectionId, int assessmentId, [FromBody] bool isVisible)
         {
             try
             {
@@ -206,14 +224,14 @@ namespace backend.Controllers
 
                 if (section == null)
                 {
-                    return NotFound(ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Section not found or you don't have access to it."));
+                    return NotFound(ApiResponse<SectionAssessmentVisibilityDto>.ErrorResponse("Section not found or you don't have access to it."));
                 }
 
                 // Verify the assessment exists
                 var assessment = await _unitOfWork.Assessments.GetByIdAsync(assessmentId);
                 if (assessment == null)
                 {
-                    return NotFound(ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Assessment not found."));
+                    return NotFound(ApiResponse<SectionAssessmentVisibilityDto>.ErrorResponse("Assessment not found."));
                 }
 
                 var visibility = await _unitOfWork.AssessmentVisibilities.GetBySectionAndAssessmentAsync(sectionId, assessmentId);
@@ -247,20 +265,27 @@ namespace backend.Controllers
                 await _unitOfWork.SaveChangesAsync();
                 
                 // Return the effective visibility status
-                var result = new SectionAssessmentVisibility
+                var result = new SectionAssessmentVisibilityDto
                 {
                     SectionId = sectionId,
                     AssessmentId = assessmentId,
                     IsVisible = isVisible,
-                    Assessment = assessment
+                    Assessment = new AssessmentDto
+                    {
+                        AssessmentId = assessment.AssessmentID,
+                        Title = assessment.Title,
+                        Description = assessment.Description,
+                        MaxScore = assessment.MaxScore,
+                        DueDate = assessment.DueDate
+                    }
                 };
                 
-                return Ok(ApiResponse<SectionAssessmentVisibility>.SuccessResponse(result, "Assessment visibility updated successfully"));
+                return Ok(ApiResponse<SectionAssessmentVisibilityDto>.SuccessResponse(result, "Assessment visibility updated successfully"));
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error updating assessment visibility: {ex.Message}");
-                return StatusCode(500, ApiResponse<SectionAssessmentVisibility>.ErrorResponse("Failed to update assessment visibility", ex.Message));
+                return StatusCode(500, ApiResponse<SectionAssessmentVisibilityDto>.ErrorResponse("Failed to update assessment visibility", ex.Message));
             }
         }
 

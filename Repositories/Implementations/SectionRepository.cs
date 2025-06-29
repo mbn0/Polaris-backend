@@ -75,5 +75,18 @@ namespace backend.Repositories.Implementations
                 .AsSplitQuery()
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Section>> GetSectionsWithDetailsAsync()
+        {
+            return await _dbSet
+                .Include(s => s.Instructor)
+                    .ThenInclude(i => i!.User)
+                .Include(s => s.Students!)
+                    .ThenInclude(st => st.User)
+                .Include(s => s.AssessmentVisibilities)
+                    .ThenInclude(av => av.Assessment)
+                .AsSplitQuery()
+                .ToListAsync();
+        }
     }
 } 

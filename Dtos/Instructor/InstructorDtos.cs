@@ -23,14 +23,31 @@ namespace backend.Dtos.Instructor
         public int StudentId { get; set; }
         public string MatricNo { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
-        public List<ResultDto> Results { get; set; } = new List<ResultDto>();
+        public List<InstructorResultDto> Results { get; set; } = new List<InstructorResultDto>();
     }
 
-    public class ResultDto
+    public class InstructorResultDto
     {
         public int AssessmentId { get; set; }
         public string AssessmentTitle { get; set; } = string.Empty;
         public float Score { get; set; }
         public DateTime DateTaken { get; set; }
+    }
+
+    public class SectionAssessmentVisibilityDto
+    {
+        public int SectionId { get; set; }
+        public int AssessmentId { get; set; }
+        public bool IsVisible { get; set; }
+        public AssessmentDto Assessment { get; set; } = new AssessmentDto();
+    }
+
+    public class AssessmentDto
+    {
+        public int AssessmentId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int MaxScore { get; set; }
+        public DateTime DueDate { get; set; }
     }
 } 
