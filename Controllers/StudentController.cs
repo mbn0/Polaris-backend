@@ -398,6 +398,74 @@ namespace backend.Controllers
             }
         }
 
+        // POST: api/student/test-results (Temporary endpoint for testing)
+        [HttpPost("test-results")]
+        public async Task<ActionResult> CreateTestResults()
+        {
+            try
+            {
+                var studentId = GetCurrentStudentId();
+                if (studentId == 0)
+                {
+                    return BadRequest("Student ID not found in token.");
+                }
+
+                // Get some assessments to create results for
+                var assessments = await _unitOfWork.Assessments.GetAllAsync();
+                var assessmentsList = assessments.Take(3).ToList();
+
+                if (!assessmentsList.Any())
+                {
+                    return NotFound("No assessments found to create test results.");
+                }
+
+                // Check if results already exist for this student
+                var existingResults = await _unitOfWork.Results.GetResultsByStudentIdAsync(studentId);
+                if (existingResults.Any())
+                {
+                    return Ok(new { message = "Test results already exist for this student." });
+                }
+
+                // Create test results
+                var testResults = new List<Result>();
+                var random = new Random();
+                
+                for (int i = 0; i < assessmentsList.Count; i++)
+                {
+                    var score = 70 + random.Next(30); // Random score between 70-100
+                    testResults.Add(new Result
+                    {
+                        StudentId = studentId,
+                        AssessmentId = assessmentsList[i].AssessmentID,
+                        Score = score,
+                        Date = DateTime.Now.AddDays(-random.Next(30)) // Random date within last 30 days
+                    });
+                }
+
+                foreach (var result in testResults)
+                {
+                    await _unitOfWork.Results.AddAsync(result);
+                }
+                await _unitOfWork.SaveChangesAsync();
+
+                return Ok(new { 
+                    message = $"Created {testResults.Count} test results successfully.",
+                    results = testResults.Select(r => new { 
+                        AssessmentId = r.AssessmentId, 
+                        Score = r.Score, 
+                        Date = r.Date 
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    message = "Error creating test results", 
+                    error = ex.Message 
+                });
+            }
+        }
+
         // GET: api/student
         // accessable by admin and instructor
         [HttpGet]
