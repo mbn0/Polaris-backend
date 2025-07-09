@@ -680,20 +680,34 @@ namespace backend.Controllers
         {
             try
             {
-                var analytics = new AdminAnalyticsDto
-                {
-                    UserGrowth = await GetUserGrowthData(),
-                    RoleDistribution = await GetRoleDistributionData(),
-                    SectionStats = await GetSectionStatsData(),
-                    RecentActivity = await GetRecentActivityData()
-                };
-
+                Console.WriteLine("Starting GetAnalytics...");
+                
+                var analytics = new AdminAnalyticsDto();
+                
+                Console.WriteLine("Getting UserGrowthData...");
+                analytics.UserGrowth = await GetUserGrowthData();
+                
+                Console.WriteLine("Getting RoleDistributionData...");
+                analytics.RoleDistribution = await GetRoleDistributionData();
+                
+                Console.WriteLine("Getting SectionStatsData...");
+                analytics.SectionStats = await GetSectionStatsData();
+                
+                Console.WriteLine("Getting RecentActivityData...");
+                analytics.RecentActivity = await GetRecentActivityData();
+                
+                Console.WriteLine("Analytics completed successfully");
                 return Ok(analytics);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting analytics: {ex.Message}");
-                return StatusCode(500, "Internal server error while getting analytics");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, new { message = "Internal server error while getting analytics", error = ex.Message });
             }
         }
 
@@ -763,206 +777,248 @@ namespace backend.Controllers
 
         private async Task<List<UserGrowthDto>> GetUserGrowthData()
         {
-            var users = await _userManager.Users.ToListAsync();
-            var userGrowth = new List<UserGrowthDto>();
-
-            // Since we don't have user creation dates, we'll simulate realistic growth data
-            // based on current user count and create a growth pattern
-            var currentUserCount = users.Count;
-            var baseStartCount = Math.Max(currentUserCount / 3, 5); // Start with roughly 1/3 of current users
-
-            // Get the last 12 months
-            for (int i = 11; i >= 0; i--)
+            try
             {
-                var month = DateTime.Now.AddMonths(-i);
-                var monthName = month.ToString("MMM yyyy");
-                
-                // Create a realistic growth pattern
-                var monthsFromStart = 12 - i;
-                var growthFactor = (double)monthsFromStart / 12;
-                var monthlyGrowth = (currentUserCount - baseStartCount) * growthFactor;
-                var usersThisMonth = baseStartCount + (int)monthlyGrowth;
-                
-                // Add some realistic variance (±10%)
-                var variance = new Random(month.GetHashCode()).Next(-usersThisMonth / 10, usersThisMonth / 10);
-                usersThisMonth = Math.Max(usersThisMonth + variance, baseStartCount);
-                
-                userGrowth.Add(new UserGrowthDto
+                Console.WriteLine("Starting GetUserGrowthData...");
+                var users = await _userManager.Users.ToListAsync();
+                var userGrowth = new List<UserGrowthDto>();
+
+                // Since we don't have user creation dates, we'll simulate realistic growth data
+                // based on current user count and create a growth pattern
+                var currentUserCount = users.Count;
+                var baseStartCount = Math.Max(currentUserCount / 3, 5); // Start with roughly 1/3 of current users
+
+                // Get the last 12 months
+                for (int i = 11; i >= 0; i--)
                 {
-                    Month = monthName,
-                    Users = usersThisMonth
-                });
-            }
+                    var month = DateTime.Now.AddMonths(-i);
+                    var monthName = month.ToString("MMM yyyy");
+                    
+                    // Create a realistic growth pattern
+                    var monthsFromStart = 12 - i;
+                    var growthFactor = (double)monthsFromStart / 12;
+                    var monthlyGrowth = (currentUserCount - baseStartCount) * growthFactor;
+                    var usersThisMonth = baseStartCount + (int)monthlyGrowth;
+                    
+                    // Add some realistic variance (±10%)
+                    var variance = new Random(month.GetHashCode()).Next(-usersThisMonth / 10, usersThisMonth / 10);
+                    usersThisMonth = Math.Max(usersThisMonth + variance, baseStartCount);
+                    
+                    userGrowth.Add(new UserGrowthDto
+                    {
+                        Month = monthName,
+                        Users = usersThisMonth
+                    });
+                }
 
-            // Ensure the last month reflects actual current user count
-            if (userGrowth.Any())
+                // Ensure the last month reflects actual current user count
+                if (userGrowth.Any())
+                {
+                    userGrowth.Last().Users = currentUserCount;
+                }
+
+                Console.WriteLine($"GetUserGrowthData completed. Generated {userGrowth.Count} data points.");
+                return userGrowth;
+            }
+            catch (Exception ex)
             {
-                userGrowth.Last().Users = currentUserCount;
+                Console.WriteLine($"Error in GetUserGrowthData: {ex.Message}");
+                throw;
             }
-
-            return userGrowth;
         }
 
         private async Task<List<RoleDistributionDto>> GetRoleDistributionData()
         {
-            var users = await _userManager.Users.ToListAsync();
-            var totalUsers = users.Count;
-
-            var roleDistribution = new List<RoleDistributionDto>();
-
-            // Get counts for each role
-            var studentCount = 0;
-            var instructorCount = 0;
-            var adminCount = 0;
-
-            foreach (var user in users)
+            try
             {
-                var roles = await _userManager.GetRolesAsync(user);
-                if (roles.Contains("Student")) studentCount++;
-                if (roles.Contains("Instructor")) instructorCount++;
-                if (roles.Contains("Admin")) adminCount++;
-            }
+                Console.WriteLine("Starting GetRoleDistributionData...");
+                var users = await _userManager.Users.ToListAsync();
+                var totalUsers = users.Count;
 
-            if (totalUsers > 0)
+                var roleDistribution = new List<RoleDistributionDto>();
+
+                // Get counts for each role
+                var studentCount = 0;
+                var instructorCount = 0;
+                var adminCount = 0;
+
+                foreach (var user in users)
+                {
+                    var roles = await _userManager.GetRolesAsync(user);
+                    if (roles.Contains("Student")) studentCount++;
+                    if (roles.Contains("Instructor")) instructorCount++;
+                    if (roles.Contains("Admin")) adminCount++;
+                }
+
+                if (totalUsers > 0)
+                {
+                    roleDistribution.Add(new RoleDistributionDto
+                    {
+                        Role = "Students",
+                        Count = studentCount,
+                        Percentage = Math.Round((double)studentCount / totalUsers * 100, 1)
+                    });
+
+                    roleDistribution.Add(new RoleDistributionDto
+                    {
+                        Role = "Instructors",
+                        Count = instructorCount,
+                        Percentage = Math.Round((double)instructorCount / totalUsers * 100, 1)
+                    });
+
+                    roleDistribution.Add(new RoleDistributionDto
+                    {
+                        Role = "Admins",
+                        Count = adminCount,
+                        Percentage = Math.Round((double)adminCount / totalUsers * 100, 1)
+                    });
+                }
+
+                Console.WriteLine($"GetRoleDistributionData completed. Students: {studentCount}, Instructors: {instructorCount}, Admins: {adminCount}");
+                return roleDistribution;
+            }
+            catch (Exception ex)
             {
-                roleDistribution.Add(new RoleDistributionDto
-                {
-                    Role = "Students",
-                    Count = studentCount,
-                    Percentage = Math.Round((double)studentCount / totalUsers * 100, 1)
-                });
-
-                roleDistribution.Add(new RoleDistributionDto
-                {
-                    Role = "Instructors",
-                    Count = instructorCount,
-                    Percentage = Math.Round((double)instructorCount / totalUsers * 100, 1)
-                });
-
-                roleDistribution.Add(new RoleDistributionDto
-                {
-                    Role = "Admins",
-                    Count = adminCount,
-                    Percentage = Math.Round((double)adminCount / totalUsers * 100, 1)
-                });
+                Console.WriteLine($"Error in GetRoleDistributionData: {ex.Message}");
+                throw;
             }
-
-            return roleDistribution;
         }
 
         private async Task<List<SectionStatsDto>> GetSectionStatsData()
         {
-            var sections = await _unitOfWork.Sections.GetSectionsWithDetailsAsync();
-            var sectionStats = new List<SectionStatsDto>();
-
-            foreach (var section in sections)
+            try
             {
-                var students = await _unitOfWork.Students.GetStudentsBySectionIdAsync(section.SectionId);
-                var instructor = await _unitOfWork.Instructors.GetInstructorWithUserAsync(section.InstructorId);
+                Console.WriteLine("Starting GetSectionStatsData...");
+                var sections = await _unitOfWork.Sections.GetSectionsWithDetailsAsync();
+                var sectionStats = new List<SectionStatsDto>();
 
-                sectionStats.Add(new SectionStatsDto
+                foreach (var section in sections)
                 {
-                    SectionId = section.SectionId,
-                    StudentCount = students.Count(),
-                    Instructor = instructor?.User?.FullName ?? "Unassigned"
-                });
-            }
+                    // Use the data already loaded instead of making additional database calls
+                    var studentCount = section.Students?.Count ?? 0;
+                    var instructorName = section.Instructor?.User?.FullName ?? "Unassigned";
 
-            return sectionStats;
+                    sectionStats.Add(new SectionStatsDto
+                    {
+                        SectionId = section.SectionId,
+                        StudentCount = studentCount,
+                        Instructor = instructorName
+                    });
+                }
+
+                Console.WriteLine($"GetSectionStatsData completed. Processed {sections.Count()} sections.");
+                return sectionStats;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetSectionStatsData: {ex.Message}");
+                throw;
+            }
         }
 
         private async Task<List<RecentActivityDto>> GetRecentActivityData()
         {
-            var recentActivity = new List<RecentActivityDto>();
-            var thirtyDaysAgo = DateTime.Now.AddDays(-30);
-            var sevenDaysAgo = DateTime.Now.AddDays(-7);
-
-            // Get all users
-            var allUsers = await _userManager.Users.ToListAsync();
-            var totalUsers = allUsers.Count;
-
-            // Get sections count
-            var sections = await _unitOfWork.Sections.GetAllAsync();
-            var totalSections = sections.Count();
-
-            // Get recent assessments completed (last 30 days)
-            var allResults = await _unitOfWork.Results.GetAllAsync();
-            var recentResults = allResults.Where(r => r.Date >= thirtyDaysAgo).ToList();
-            var veryRecentResults = allResults.Where(r => r.Date >= sevenDaysAgo).ToList();
-
-            // Get students assigned to sections
-            var students = await _unitOfWork.Students.GetAllAsync();
-            var enrolledStudents = students.Where(s => s.SectionId.HasValue).ToList();
-
-            // Calculate realistic activity counts and trends
-            
-            // 1. User Registrations (simulate recent activity based on total users)
-            var simulatedRecentRegistrations = Math.Max(1, totalUsers / 10); // ~10% of users as "recent"
-            var userTrend = totalUsers > 20 ? "up" : totalUsers > 10 ? "stable" : "down";
-            
-            recentActivity.Add(new RecentActivityDto
+            try
             {
-                Action = "New User Registrations",
-                Count = simulatedRecentRegistrations,
-                Trend = userTrend
-            });
+                Console.WriteLine("Starting GetRecentActivityData...");
+                var recentActivity = new List<RecentActivityDto>();
+                var thirtyDaysAgo = DateTime.Now.AddDays(-30);
+                var sevenDaysAgo = DateTime.Now.AddDays(-7);
 
-            // 2. Active Sections
-            var activeSections = totalSections;
-            var sectionTrend = activeSections > 5 ? "up" : activeSections > 2 ? "stable" : activeSections > 0 ? "down" : "stable";
-            
-            recentActivity.Add(new RecentActivityDto
+                // Get all users
+                var allUsers = await _userManager.Users.ToListAsync();
+                var totalUsers = allUsers.Count;
+
+                // Get sections count
+                var sections = await _unitOfWork.Sections.GetAllAsync();
+                var totalSections = sections.Count();
+
+                // Get recent assessments completed (last 30 days)
+                var allResults = await _unitOfWork.Results.GetAllAsync();
+                var recentResults = allResults.Where(r => r.Date >= thirtyDaysAgo).ToList();
+                var veryRecentResults = allResults.Where(r => r.Date >= sevenDaysAgo).ToList();
+
+                // Get students assigned to sections
+                var students = await _unitOfWork.Students.GetAllAsync();
+                var enrolledStudents = students.Where(s => s.SectionId.HasValue).ToList();
+
+                // Calculate realistic activity counts and trends
+                
+                // 1. User Registrations (simulate recent activity based on total users)
+                var simulatedRecentRegistrations = Math.Max(1, totalUsers / 10); // ~10% of users as "recent"
+                var userTrend = totalUsers > 20 ? "up" : totalUsers > 10 ? "stable" : "down";
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "New User Registrations",
+                    Count = simulatedRecentRegistrations,
+                    Trend = userTrend
+                });
+
+                // 2. Active Sections
+                var activeSections = totalSections;
+                var sectionTrend = activeSections > 5 ? "up" : activeSections > 2 ? "stable" : activeSections > 0 ? "down" : "stable";
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "Active Sections",
+                    Count = activeSections,
+                    Trend = sectionTrend
+                });
+
+                // 3. Assessments Completed (real data from last 30 days)
+                var assessmentTrend = recentResults.Count > veryRecentResults.Count * 3 ? "up" : 
+                                     recentResults.Count < 5 ? "down" : "stable";
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "Assessments Completed",
+                    Count = recentResults.Count,
+                    Trend = assessmentTrend
+                });
+
+                // 4. Student Enrollments
+                var enrollmentTrend = enrolledStudents.Count > totalUsers * 0.6 ? "up" : 
+                                    enrolledStudents.Count > totalUsers * 0.3 ? "stable" : "down";
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "Student Enrollments",
+                    Count = enrolledStudents.Count,
+                    Trend = enrollmentTrend
+                });
+
+                // 5. Assessment Visibility Changes - Skip this for now to avoid SectionAssessmentVisibilities table
+                // Since the table might not exist, we'll simulate this data
+                var assessments = await _unitOfWork.Assessments.GetAllAsync();
+                var visibilityChanges = Math.Min(assessments.Count() * totalSections / 4, 15); // Simulate activity
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "Assessment Visibility Updates",
+                    Count = visibilityChanges,
+                    Trend = visibilityChanges > 5 ? "up" : "stable"
+                });
+
+                // 6. System Activity Score (overall engagement)
+                var overallActivity = (recentResults.Count * 3) + enrolledStudents.Count + (totalSections * 5);
+                var activityTrend = overallActivity > 50 ? "up" : overallActivity > 20 ? "stable" : "down";
+                
+                recentActivity.Add(new RecentActivityDto
+                {
+                    Action = "Overall Platform Activity",
+                    Count = Math.Min(overallActivity, 99), // Cap for display
+                    Trend = activityTrend
+                });
+
+                Console.WriteLine($"GetRecentActivityData completed. Generated {recentActivity.Count} activity items.");
+                return recentActivity;
+            }
+            catch (Exception ex)
             {
-                Action = "Active Sections",
-                Count = activeSections,
-                Trend = sectionTrend
-            });
-
-            // 3. Assessments Completed (real data from last 30 days)
-            var assessmentTrend = recentResults.Count > veryRecentResults.Count * 3 ? "up" : 
-                                 recentResults.Count < 5 ? "down" : "stable";
-            
-            recentActivity.Add(new RecentActivityDto
-            {
-                Action = "Assessments Completed",
-                Count = recentResults.Count,
-                Trend = assessmentTrend
-            });
-
-            // 4. Student Enrollments
-            var enrollmentTrend = enrolledStudents.Count > totalUsers * 0.6 ? "up" : 
-                                enrolledStudents.Count > totalUsers * 0.3 ? "stable" : "down";
-            
-            recentActivity.Add(new RecentActivityDto
-            {
-                Action = "Student Enrollments",
-                Count = enrolledStudents.Count,
-                Trend = enrollmentTrend
-            });
-
-            // 5. Assessment Visibility Changes (simulated based on sections and assessments)
-            var assessments = await _unitOfWork.Assessments.GetAllAsync();
-            var visibilityChanges = Math.Min(assessments.Count() * totalSections / 4, 15); // Simulate activity
-            
-            recentActivity.Add(new RecentActivityDto
-            {
-                Action = "Assessment Visibility Updates",
-                Count = visibilityChanges,
-                Trend = visibilityChanges > 5 ? "up" : "stable"
-            });
-
-            // 6. System Activity Score (overall engagement)
-            var overallActivity = (recentResults.Count * 3) + enrolledStudents.Count + (totalSections * 5);
-            var activityTrend = overallActivity > 50 ? "up" : overallActivity > 20 ? "stable" : "down";
-            
-            recentActivity.Add(new RecentActivityDto
-            {
-                Action = "Overall Platform Activity",
-                Count = Math.Min(overallActivity, 99), // Cap for display
-                Trend = activityTrend
-            });
-
-            return recentActivity;
+                Console.WriteLine($"Error in GetRecentActivityData: {ex.Message}");
+                throw;
+            }
         }
     }
 }
