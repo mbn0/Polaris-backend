@@ -88,8 +88,8 @@ builder.Services.Configure<IdentityOptions>(options =>
         options.Password.RequireLowercase = true;
         // Lockout settings
 
-        // options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-        // options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     });
 
 // AllowAnyOrigin
