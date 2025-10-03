@@ -19,6 +19,8 @@ builder.Services.AddSwaggerGen();
 
 //Interfaces 
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddHttpClient();
 
 // Repository pattern
 builder.Services.AddScoped<backend.Repositories.Interfaces.IUnitOfWork, backend.Repositories.Implementations.UnitOfWork>();
