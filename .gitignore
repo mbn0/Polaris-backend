@@ -3,6 +3,7 @@
 ##
 ## Get latest from `dotnet new gitignore`
 appsettings.json
+appsettings.Development.json
 
 # dotenv files
 .env
@@ -136,7 +137,7 @@ $tf/
 
 # ReSharper is a .NET coding add-in
 _ReSharper*/
-*.[Rr]e[Ss]harper
+*. [Rr]e[Ss]harper
 *.DotSettings.user
 
 # TeamCity is a build add-in
@@ -218,7 +219,7 @@ csx/
 *.build.csdef
 
 # Microsoft Azure Emulator
-ecf/
+ecff/
 rcf/
 
 # Windows Store app package directories and files
