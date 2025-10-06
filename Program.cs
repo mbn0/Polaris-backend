@@ -147,10 +147,6 @@ if (app.Environment.IsDevelopment())
 }
 
 
-app.UseAuthentication();
-app.UseAuthorization();
-
-
 // Only redirect to HTTPS in production
 if (!app.Environment.IsDevelopment())
 {
@@ -159,8 +155,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRouting();
 app.UseCors("AllowOrigin");
-app.UseAuthorization(); // if using [Authorize] somewhere
-app.MapControllers();   // required for route mapping
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();
 
